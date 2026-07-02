@@ -1,0 +1,7 @@
+interface:
+  display_name: "Ask Vision"
+  short_description: "Ask a configured multimodal model about media."
+  default_prompt: "Use $ask-vision to inspect attached media with an external multimodal model."
+
+policy:
+  allow_implicit_invocation: true
