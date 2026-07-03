@@ -68,8 +68,8 @@ Generic Llama 1/2/3/3.1/3.3 and Code Llama models are usually text-only.
 
 ### Qwen / Alibaba
 
-- `Qwen/Qwen3.6-35B-A3B` and aliases containing `qwen3.6-35b-a3b`; official model card marks it as image-text-to-text and a causal language model with a vision encoder.
-- `Qwen3.6-Plus` when the platform documents multimodal or visual input for that deployment.
+- `Qwen3.6-*`, `Qwen-3.6-*`, `Qwen/Qwen3.6-*`, and served or quantized aliases with suffixes such as AWQ/GPTQ/GGUF/bnb when the provider exposes them as image-text-to-text or multimodal. This includes `Qwen/Qwen3.6-35B-A3B`; its official model card marks it as image-text-to-text and a causal language model with a vision encoder.
+- `Qwen3.6-Plus` and other hosted Qwen3.6 aliases when the platform documents multimodal or visual input for that deployment.
 - `Qwen3.5-*` native multimodal variants when the platform documents image/video input.
 - `Qwen3-VL-*`
 - `Qwen3-Omni-*`
@@ -79,7 +79,7 @@ Generic Llama 1/2/3/3.1/3.3 and Code Llama models are usually text-only.
 - `Qwen-VL`, `Qwen-VL-Chat`, `qwen-vl-plus`, `qwen-vl-max`
 - `QvQ-*` visual reasoning variants
 
-Do not assume every `qwen3*` or `qwen3.6*` alias is visual. `qwen-coder`, `qwen-math`, and many base/instruct text models are not suitable for this skill unless the provider explicitly enables media input.
+Do not assume every generic `qwen3*` alias is visual. Treat Qwen3.6-family names as high-priority vision candidates because many variants and quantized deployments keep the family prefix, but still verify the exact endpoint. `qwen-coder`, `qwen-math`, and many base/instruct text models are not suitable for this skill unless the provider explicitly enables media input.
 
 ### Z.AI / GLM / Zhipu
 
@@ -130,7 +130,7 @@ These names should normally be avoided for visual recognition unless the provide
 - `codestral*`, `devstral*`, `magistral*`, `leanstral*`, `mistral-embed`, `mistral-moderation*`
 - `grok-build-*`
 - `Llama-1`, `Llama-2`, generic `Llama-3`, `Llama-3.1`, `Llama-3.3`, `Code-Llama`
-- `qwen-coder*`, `qwen3-coder*`, `qwen-math*`, generic `qwq*`, generic `qwen3*` text/base/instruct variants without multimodal documentation
+- `qwen-coder*`, `qwen3-coder*`, `qwen-math*`, generic `qwq*`, generic `qwen3*` text/base/instruct variants without multimodal documentation or Qwen3.5/Qwen3.6 multimodal deployment support
 - `glm-5.2`, `glm-5.1`, `glm-5`, `glm-5-turbo`, `glm-4.7`, `glm-4.6`, `glm-4.5` when not suffixed with `v`
 - `deepseek-chat`, `deepseek-reasoner`, `deepseek-v*` unless a future DeepSeek endpoint explicitly documents image input
 - `command-r*`, `command-a-reasoning-*`, `command-a-translate-*`

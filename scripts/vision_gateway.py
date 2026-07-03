@@ -48,8 +48,8 @@ VISION_MODEL_PATTERNS = (
     r"llama-3\.2.*vision",
     r"qwen.*vl",
     r"qwen.*omni",
-    r"qwen3\.6",
-    r"qwen3\.5",
+    r"qwen[-_/]?3\.6",
+    r"qwen[-_/]?3\.5",
     r"\bqvq\b",
     r"glm-5v",
     r"glm-4\.6v",
@@ -299,10 +299,10 @@ def matches_any(model: str, patterns: tuple[str, ...]) -> bool:
 
 
 def classify_model(model: str) -> str:
-    if matches_any(model, VISION_MODEL_PATTERNS):
-        return "likely_multimodal"
     if matches_any(model, TEXT_ONLY_OR_NON_CHAT_PATTERNS):
         return "likely_text_only"
+    if matches_any(model, VISION_MODEL_PATTERNS):
+        return "likely_multimodal"
     return "unknown"
 
 
