@@ -1,6 +1,6 @@
 # Model Capability Hints
 
-Use this file when `/v1/models` returns multiple candidates or unfamiliar model names. It is a heuristic reference, not an authority. Provider aliases change often, deployments can disable media inputs, and gateway vendors may expose custom names. When more than one plausible model remains, ask the user or run a small visual test request if allowed.
+Use this file when `/v1/models` returns multiple candidates or unfamiliar model names. Do not rely on this list alone. It is only a heuristic candidate-sorting reference, not an authority. Provider aliases change often, deployments can disable media inputs, and gateway vendors may expose custom names. Always prefer the actual provider documentation, the exact model metadata returned by the endpoint, and the result of a real media request. When more than one plausible model remains, ask the user or run a small visual test request if allowed.
 
 Last reviewed: 2026-07-03.
 
@@ -11,6 +11,7 @@ Last reviewed: 2026-07-03.
 3. Avoid names containing `embed`, `embedding`, `rerank`, `moderation`, `tts`, `asr`, `transcribe`, `image-generation`, `video-generation`, `coder`, or `math` unless the provider documentation explicitly says that model accepts images/video/audio as input.
 4. Do not assume a generation model can understand media. Text-to-image, image-to-image, video-generation, OCR-only, ASR-only, and TTS-only models are not general visual recognition chat models.
 5. Treat provider-specific endpoints as final truth. A model that is vision-capable in one hosted service may be text-only through another gateway.
+6. If the API rejects an image/audio/video request, update the working assumption immediately: the live endpoint result overrides this static list.
 
 ## Likely Vision Or Multimodal
 

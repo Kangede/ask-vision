@@ -49,7 +49,9 @@ python scripts/vision_gateway.py models \
 ```
 
 The output includes `likely_multimodal`, `likely_text_only`, and `unknown`
-groups based on `references/model-capabilities.md`.
+groups based on `references/model-capabilities.md`. These groups are hints,
+not proof. Use the provider's live behavior and documentation as the final
+source of truth.
 
 Save a config:
 

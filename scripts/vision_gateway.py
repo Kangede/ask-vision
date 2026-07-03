@@ -419,6 +419,7 @@ def cmd_models(args: argparse.Namespace) -> None:
                 "likely_multimodal": capability_groups["likely_multimodal"],
                 "likely_text_only": capability_groups["likely_text_only"],
                 "unknown": capability_groups["unknown"],
+                "classification_note": "Model capability groups are heuristic hints only. Provider documentation, endpoint metadata, and a real media request result take precedence.",
                 "count": len(models),
             }
             if args.raw:
