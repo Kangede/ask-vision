@@ -10,6 +10,7 @@ import json
 import mimetypes
 import os
 from pathlib import Path
+import re
 import sys
 import time
 from typing import Any
@@ -23,6 +24,94 @@ API_KEY_ENV = "ASK_VISION_API_KEY"
 MODEL_ENV = "ASK_VISION_MODEL"
 ANTHROPIC_VERSION_ENV = "ASK_VISION_ANTHROPIC_VERSION"
 DEFAULT_ANTHROPIC_VERSION = "2023-06-01"
+
+VISION_MODEL_PATTERNS = (
+    r"\bvision\b",
+    r"\bvisual\b",
+    r"\bvlm\b",
+    r"(^|[-_/])vl($|[-_/])",
+    r"\bomni\b",
+    r"\bmultimodal\b",
+    r"image[-_ ]?text[-_ ]?to[-_ ]?text",
+    r"gpt-4o",
+    r"gpt-4\.1",
+    r"gpt-5",
+    r"\bo3\b",
+    r"\bo4-mini\b",
+    r"claude-(fable|opus|sonnet|haiku|3|4|5)",
+    r"gemini-(1\.5|2\.5|3|3\.1|3\.5)",
+    r"pixtral",
+    r"mistral-(large|medium|small)-25",
+    r"ministral-(14b|8b|3b)-25",
+    r"grok-4",
+    r"llama-4",
+    r"llama-3\.2.*vision",
+    r"qwen.*vl",
+    r"qwen.*omni",
+    r"qwen3\.6",
+    r"qwen3\.5",
+    r"\bqvq\b",
+    r"glm-5v",
+    r"glm-4\.6v",
+    r"glm-4\.5v",
+    r"glm-ocr",
+    r"autoglm-phone",
+    r"command-a-vision",
+    r"aya-vision",
+    r"command-a-plus-05-2026",
+    r"nova-(premier|pro|lite)",
+    r"llava",
+    r"internvl",
+    r"minicpm[-_ ]?(v|o)",
+    r"molmo",
+    r"idefics",
+    r"florence",
+    r"kimi-vl",
+    r"minimax-vl",
+)
+
+TEXT_ONLY_OR_NON_CHAT_PATTERNS = (
+    r"gpt-3\.5",
+    r"text-davinci",
+    r"\b(davinci|babbage|curie|ada)\b",
+    r"claude-(2|instant)",
+    r"(text|chat)-bison",
+    r"codestral",
+    r"devstral",
+    r"magistral",
+    r"leanstral",
+    r"mistral-(embed|moderation)",
+    r"grok-build",
+    r"code[-_ ]?llama",
+    r"llama-(1|2|3|3\.1|3\.3)(?!.*vision)",
+    r"qwen.*coder",
+    r"qwen.*math",
+    r"\bqwq\b",
+    r"\bglm[-_.]?5\.?2\b",
+    r"\bglm[-_.]?5\.?1\b",
+    r"\bglm[-_.]?5(?:[-_.]?turbo)?\b",
+    r"\bglm[-_.]?4\.?7\b",
+    r"\bglm[-_.]?4\.?6\b",
+    r"\bglm[-_.]?4\.?5\b",
+    r"deepseek",
+    r"command-r",
+    r"command-a-(reasoning|translate)",
+    r"embed",
+    r"embedding",
+    r"rerank",
+    r"moderation",
+    r"whisper",
+    r"\basr\b",
+    r"\btts\b",
+    r"dall[-_ ]?e",
+    r"imagen",
+    r"sora",
+    r"\bveo\b",
+    r"cogview",
+    r"cogvideo",
+    r"\bvidu\b",
+    r"nova-micro",
+)
 
 
 class ApiError(Exception):
@@ -200,24 +289,32 @@ def extract_models(data: dict[str, Any]) -> list[str]:
     return sorted(dict.fromkeys(models))
 
 
-def likely_multimodal(models: list[str]) -> list[str]:
-    hints = (
-        "vision",
-        "visual",
-        "vl",
-        "omni",
-        "4o",
-        "multimodal",
-        "claude",
-        "sonnet",
-        "opus",
-        "haiku",
-        "gemini",
-        "qwen-vl",
-        "llava",
-    )
-    preferred = [model for model in models if any(hint in model.lower() for hint in hints)]
-    return preferred or models
+def normalize_model_name(model: str) -> str:
+    return model.lower().replace("_", "-")
+
+
+def matches_any(model: str, patterns: tuple[str, ...]) -> bool:
+    normalized = normalize_model_name(model)
+    return any(re.search(pattern, normalized) for pattern in patterns)
+
+
+def classify_model(model: str) -> str:
+    if matches_any(model, VISION_MODEL_PATTERNS):
+        return "likely_multimodal"
+    if matches_any(model, TEXT_ONLY_OR_NON_CHAT_PATTERNS):
+        return "likely_text_only"
+    return "unknown"
+
+
+def model_capability_groups(models: list[str]) -> dict[str, list[str]]:
+    groups = {
+        "likely_multimodal": [],
+        "likely_text_only": [],
+        "unknown": [],
+    }
+    for model in models:
+        groups[classify_model(model)].append(model)
+    return groups
 
 
 def model_pages_url(base: str, after_id: str | None = None) -> str:
@@ -313,12 +410,15 @@ def cmd_models(args: argparse.Namespace) -> None:
         )
         all_errors.extend(errors)
         if base:
+            capability_groups = model_capability_groups(models)
             result: dict[str, Any] = {
                 "ok": True,
                 "provider": candidate_provider,
                 "base_url": base,
                 "models": models,
-                "likely_multimodal": likely_multimodal(models),
+                "likely_multimodal": capability_groups["likely_multimodal"],
+                "likely_text_only": capability_groups["likely_text_only"],
+                "unknown": capability_groups["unknown"],
                 "count": len(models),
             }
             if args.raw:

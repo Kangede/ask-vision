@@ -22,6 +22,7 @@ OpenClaw, Hermes, shell-based agents, and other custom agents.
 
 - `SKILL.md` - the skill instructions for agents.
 - `scripts/vision_gateway.py` - the provider-compatible helper script.
+- `references/model-capabilities.md` - heuristic model capability list for choosing a vision-capable model from `/v1/models`.
 - `agents/openai.yaml` - optional UI metadata for environments that support it.
 
 ## Requirements
@@ -46,6 +47,9 @@ python scripts/vision_gateway.py models \
   --base-url https://api.example.com \
   --api-key "$API_KEY"
 ```
+
+The output includes `likely_multimodal`, `likely_text_only`, and `unknown`
+groups based on `references/model-capabilities.md`.
 
 Save a config:
 

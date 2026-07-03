@@ -30,7 +30,7 @@ Use this skill as a generic bridge from a text-only model or agent to a user-con
    python scripts/vision_gateway.py models --provider auto --base-url <api-url> --api-key <api-key>
    ```
 
-   If multiple plausible vision/multimodal models are returned, ask the user to choose. If discovery fails, ask the user to manually provide a model name or explain why the endpoint/key appears unusable.
+   Read `references/model-capabilities.md` when the discovered model names are unfamiliar or when choosing among multiple candidates. Prefer models classified as likely multimodal/vision-capable, avoid known text-only/generation/embedding models for visual recognition, and ask the user when several plausible models remain. If discovery fails, ask the user to manually provide a model name or explain why the endpoint/key appears unusable.
 
 5. Save a working config unless the user says not to persist it:
 
@@ -100,6 +100,8 @@ python scripts/vision_gateway.py ask --prompt "Describe this image." --media ima
 python scripts/vision_gateway.py ask --prompt-stdin --media image.png
 python scripts/vision_gateway.py clear-config
 ```
+
+The `models` command returns `likely_multimodal`, `likely_text_only`, and `unknown` lists. Treat these as selection hints, not proof: provider aliases change often, and a small test request is the best confirmation when the user permits it.
 
 Settings are read from CLI flags, then environment variables, then the config file:
 
