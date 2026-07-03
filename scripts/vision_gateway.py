@@ -28,6 +28,10 @@ ANTHROPIC_VERSION_ENV = "ASK_VISION_ANTHROPIC_VERSION"
 PROMPT_ENCODING_ENV = "ASK_VISION_PROMPT_ENCODING"
 DEFAULT_ANTHROPIC_VERSION = "2023-06-01"
 DEFAULT_ANTHROPIC_MAX_TOKENS = 128000
+if sys.platform == "darwin":
+    LEGACY_TEXT_ENCODINGS = ("mac_roman", "cp1252", "iso-8859-1")
+else:
+    LEGACY_TEXT_ENCODINGS = ("cp1252", "mac_roman", "iso-8859-1")
 
 VISION_MODEL_PATTERNS = (
     r"\bvision\b",
@@ -167,9 +171,7 @@ def preferred_text_encodings(data: bytes, requested: str | None = None) -> list[
             sys.stdin.encoding or "",
             locale.getpreferredencoding(False),
             "gb18030",
-            "utf-16",
-            "utf-16-le",
-            "utf-16-be",
+            *LEGACY_TEXT_ENCODINGS,
         ]
     )
 
@@ -200,6 +202,27 @@ def decode_text_bytes(data: bytes, source: str, requested: str | None = None) ->
         },
         2,
     )
+
+
+def has_surrogateescape_chars(text: str) -> bool:
+    return any(0xDC80 <= ord(char) <= 0xDCFF for char in text)
+
+
+def surrogateescape_text_to_bytes(text: str) -> bytes:
+    data = bytearray()
+    for char in text:
+        codepoint = ord(char)
+        if 0xDC80 <= codepoint <= 0xDCFF:
+            data.append(codepoint - 0xDC00)
+        else:
+            data.extend(char.encode("utf-8"))
+    return bytes(data)
+
+
+def decode_inline_text(text: str, source: str, requested: str | None = None) -> str:
+    if not has_surrogateescape_chars(text):
+        return text
+    return decode_text_bytes(surrogateescape_text_to_bytes(text), source, requested)
 
 
 def default_config_path() -> Path:
@@ -574,7 +597,7 @@ def anthropic_media_item(media: Media) -> dict[str, Any]:
 def load_prompt(args: argparse.Namespace) -> str:
     parts: list[str] = []
     if args.prompt:
-        parts.append(args.prompt)
+        parts.append(decode_inline_text(args.prompt, "prompt argument", args.prompt_encoding))
     if args.prompt_base64:
         try:
             prompt_bytes = base64.b64decode(args.prompt_base64, validate=True)
@@ -627,7 +650,7 @@ def build_openai_payload(args: argparse.Namespace, model: str, prompt: str, medi
     content.append({"type": "text", "text": prompt})
     messages: list[dict[str, Any]] = []
     if args.system:
-        messages.append({"role": "system", "content": args.system})
+        messages.append({"role": "system", "content": decode_inline_text(args.system, "system argument", args.prompt_encoding)})
     messages.append({"role": "user", "content": content})
     payload: dict[str, Any] = {"model": model, "messages": messages, "temperature": args.temperature}
     if args.max_tokens is not None:
@@ -646,7 +669,7 @@ def build_anthropic_payload(args: argparse.Namespace, model: str, prompt: str, m
         "messages": [{"role": "user", "content": content}],
     }
     if args.system:
-        payload["system"] = args.system
+        payload["system"] = decode_inline_text(args.system, "system argument", args.prompt_encoding)
     return payload
 
 
@@ -734,7 +757,7 @@ def build_parser() -> argparse.ArgumentParser:
     ask.add_argument("--prompt-base64", help="Base64-encoded prompt text. Use this as an ASCII-safe path when shells or terminals mangle Unicode.")
     ask.add_argument("--prompt-file", help="Prompt file. Encoding is controlled by --prompt-encoding.")
     ask.add_argument("--prompt-stdin", action="store_true", help="Read prompt text from standard input as bytes, then decode with --prompt-encoding.")
-    ask.add_argument("--prompt-encoding", default=os.environ.get(PROMPT_ENCODING_ENV, "auto"), help="Prompt file/stdin encoding. Use 'auto' to try BOM, UTF-8, terminal locale, GB18030, and UTF-16 variants. Defaults to $ASK_VISION_PROMPT_ENCODING or auto.")
+    ask.add_argument("--prompt-encoding", default=os.environ.get(PROMPT_ENCODING_ENV, "auto"), help="Prompt file/stdin encoding. Use 'auto' to try BOM, UTF-8, terminal locale, GB18030, obvious UTF-16 byte patterns, and common legacy encodings. Defaults to $ASK_VISION_PROMPT_ENCODING or auto.")
     ask.add_argument("--media", action="append", help="Local media path, HTTP(S) URL, or data URL. Repeat for multiple media files.")
     ask.add_argument("--system", help="Optional system message.")
     ask.add_argument("--detail", default="auto", choices=["auto", "low", "high"], help="Image detail hint for providers that support it.")

@@ -15,7 +15,7 @@ OpenClaw, Hermes, shell-based agents, and other custom agents.
 - Discovers available models from `/v1/models` when possible.
 - Accepts prompts from CLI text, stdin, or a prompt file.
 - Accepts base64-encoded prompts for ASCII-safe shell handoff.
-- Auto-decodes prompt files/stdin across common Windows and UTF encodings when possible.
+- Auto-decodes prompt files/stdin across common Windows, macOS, Linux, and UTF encodings when possible.
 - Accepts media as a local path, public URL, or `data:` URL.
 - Reads local media files and sends them as structured API media content.
 - Keeps API credentials out of prompts and user-facing output.
@@ -159,20 +159,27 @@ usually fail.
 Large audio or video files are often better passed as provider-accessible URLs
 or shortened clips, because inline API request bodies have size limits.
 
-## Windows Encoding
+## Shell And Encoding Compatibility
 
 The helper reads `--prompt-file` and `--prompt-stdin` as bytes and decodes them
 with `--prompt-encoding auto` by default. Auto mode tries BOM-detected UTF,
-UTF-8, the terminal locale, GB18030, and UTF-16 variants. This avoids many
-PowerShell issues where redirected text may be UTF-16 or the terminal may use
-GBK/CP936 instead of UTF-8.
+UTF-8, the terminal locale, GB18030, obvious UTF-16 byte patterns, cp1252,
+ISO-8859-1, and mac_roman. This avoids many PowerShell issues where redirected
+text may be UTF-16 or the terminal may use GBK/CP936 instead of UTF-8. It also
+helps on Linux/macOS when a process runs under `LANG=C`, an older non-UTF-8
+locale, or a CI/remote shell with unusual encoding settings.
 
 JSON output is ASCII-escaped so legacy Windows consoles do not fail when a
-provider returns Unicode text. Set `ASK_VISION_PROMPT_ENCODING` or pass
-`--prompt-encoding <encoding>` when the host runtime knows the exact encoding.
-If the shell has already replaced characters with question marks before Python
-receives stdin, the original text cannot be recovered; use `--prompt-file` with
-an explicit encoding or `--prompt-base64` for that case.
+provider returns Unicode text; this is also safe for non-UTF-8 Unix pipes. On
+Unix-like systems, inline `--prompt` and `--system` values that arrive through
+Python's surrogateescape mechanism are re-decoded from their original argument
+bytes. Set `ASK_VISION_PROMPT_ENCODING` or pass `--prompt-encoding <encoding>`
+when the host runtime knows the exact encoding. If the shell has already
+replaced characters with question marks before Python receives them, the
+original text cannot be recovered; use `--prompt-file` with an explicit encoding
+or `--prompt-base64` for that case.
+For UTF-16 files without a BOM, pass `--prompt-encoding utf-16-le` or
+`--prompt-encoding utf-16-be`.
 
 ## Validate
 
