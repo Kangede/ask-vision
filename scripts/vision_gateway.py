@@ -24,6 +24,7 @@ API_KEY_ENV = "ASK_VISION_API_KEY"
 MODEL_ENV = "ASK_VISION_MODEL"
 ANTHROPIC_VERSION_ENV = "ASK_VISION_ANTHROPIC_VERSION"
 DEFAULT_ANTHROPIC_VERSION = "2023-06-01"
+DEFAULT_ANTHROPIC_MAX_TOKENS = 128000
 
 VISION_MODEL_PATTERNS = (
     r"\bvision\b",
@@ -559,7 +560,7 @@ def build_openai_payload(args: argparse.Namespace, model: str, prompt: str, medi
         messages.append({"role": "system", "content": args.system})
     messages.append({"role": "user", "content": content})
     payload: dict[str, Any] = {"model": model, "messages": messages, "temperature": args.temperature}
-    if args.max_tokens:
+    if args.max_tokens is not None:
         payload["max_tokens"] = args.max_tokens
     return payload
 
@@ -567,9 +568,10 @@ def build_openai_payload(args: argparse.Namespace, model: str, prompt: str, medi
 def build_anthropic_payload(args: argparse.Namespace, model: str, prompt: str, media: list[Media]) -> dict[str, Any]:
     content = [anthropic_media_item(item) for item in media]
     content.append({"type": "text", "text": prompt})
+    max_tokens = args.max_tokens if args.max_tokens is not None else DEFAULT_ANTHROPIC_MAX_TOKENS
     payload: dict[str, Any] = {
         "model": model,
-        "max_tokens": args.max_tokens or 2048,
+        "max_tokens": max_tokens,
         "temperature": args.temperature,
         "messages": [{"role": "user", "content": content}],
     }
@@ -665,7 +667,7 @@ def build_parser() -> argparse.ArgumentParser:
     ask.add_argument("--system", help="Optional system message.")
     ask.add_argument("--detail", default="auto", choices=["auto", "low", "high"], help="Image detail hint for providers that support it.")
     ask.add_argument("--max-inline-mb", type=float, default=25.0, help="Maximum local media size to inline as base64.")
-    ask.add_argument("--max-tokens", type=int, default=2048)
+    ask.add_argument("--max-tokens", type=int, default=None, help=f"Maximum output tokens. Defaults to {DEFAULT_ANTHROPIC_MAX_TOKENS} for Anthropic-compatible requests and is omitted for OpenAI-compatible requests.")
     ask.add_argument("--temperature", type=float, default=0.0)
     ask.add_argument("--dry-run", action="store_true", help="Build and print the request payload without calling the API.")
     ask.add_argument("--raw", action="store_true", help="Include raw provider response.")
