@@ -5,8 +5,10 @@ from __future__ import annotations
 
 import argparse
 import base64
+import binascii
 from dataclasses import dataclass
 import json
+import locale
 import mimetypes
 import os
 from pathlib import Path
@@ -23,6 +25,7 @@ BASE_URL_ENV = "ASK_VISION_BASE_URL"
 API_KEY_ENV = "ASK_VISION_API_KEY"
 MODEL_ENV = "ASK_VISION_MODEL"
 ANTHROPIC_VERSION_ENV = "ASK_VISION_ANTHROPIC_VERSION"
+PROMPT_ENCODING_ENV = "ASK_VISION_PROMPT_ENCODING"
 DEFAULT_ANTHROPIC_VERSION = "2023-06-01"
 DEFAULT_ANTHROPIC_MAX_TOKENS = 128000
 
@@ -135,8 +138,68 @@ class Media:
 
 
 def emit(payload: dict[str, Any], code: int = 0) -> None:
-    print(json.dumps(payload, ensure_ascii=False, indent=2))
+    print(json.dumps(payload, ensure_ascii=True, indent=2))
     raise SystemExit(code)
+
+
+def preferred_text_encodings(data: bytes, requested: str | None = None) -> list[str]:
+    if requested and requested.lower() != "auto":
+        return [requested]
+
+    encodings: list[str] = []
+    if data.startswith(b"\xef\xbb\xbf"):
+        encodings.append("utf-8-sig")
+    elif data.startswith((b"\xff\xfe", b"\xfe\xff")):
+        encodings.append("utf-16")
+    elif len(data) >= 4:
+        even_nuls = data[0::2].count(0)
+        odd_nuls = data[1::2].count(0)
+        sample_units = max(1, len(data) // 2)
+        if odd_nuls / sample_units > 0.25:
+            encodings.append("utf-16-le")
+        elif even_nuls / sample_units > 0.25:
+            encodings.append("utf-16-be")
+
+    encodings.extend(
+        [
+            "utf-8-sig",
+            "utf-8",
+            sys.stdin.encoding or "",
+            locale.getpreferredencoding(False),
+            "gb18030",
+            "utf-16",
+            "utf-16-le",
+            "utf-16-be",
+        ]
+    )
+
+    deduped: list[str] = []
+    for encoding in encodings:
+        normalized = encoding.strip()
+        if normalized and normalized.lower() not in [item.lower() for item in deduped]:
+            deduped.append(normalized)
+    return deduped
+
+
+def decode_text_bytes(data: bytes, source: str, requested: str | None = None) -> str:
+    errors: list[str] = []
+    for encoding in preferred_text_encodings(data, requested):
+        try:
+            text = data.decode(encoding)
+        except (LookupError, UnicodeError) as exc:
+            errors.append(f"{encoding}: {exc}")
+            continue
+        return text.lstrip("\ufeff")
+    emit(
+        {
+            "ok": False,
+            "error": f"Could not decode {source}",
+            "tried_encodings": preferred_text_encodings(data, requested),
+            "decode_errors": errors,
+            "suggestion": "Pass --prompt-encoding with the actual encoding, or write the prompt as UTF-8.",
+        },
+        2,
+    )
 
 
 def default_config_path() -> Path:
@@ -236,7 +299,7 @@ def http_json(
     }
     body = None
     if payload is not None:
-        request_headers["Content-Type"] = "application/json"
+        request_headers["Content-Type"] = "application/json; charset=utf-8"
         body = json.dumps(payload).encode("utf-8")
     req = request.Request(url, data=body, headers=request_headers, method=method)
     try:
@@ -512,12 +575,19 @@ def load_prompt(args: argparse.Namespace) -> str:
     parts: list[str] = []
     if args.prompt:
         parts.append(args.prompt)
+    if args.prompt_base64:
+        try:
+            prompt_bytes = base64.b64decode(args.prompt_base64, validate=True)
+        except binascii.Error as exc:
+            emit({"ok": False, "error": f"Invalid --prompt-base64 value: {exc}"}, 2)
+        parts.append(decode_text_bytes(prompt_bytes, "prompt-base64", args.prompt_encoding))
     if args.prompt_file:
-        parts.append(Path(args.prompt_file).expanduser().read_text(encoding="utf-8"))
+        prompt_path = Path(args.prompt_file).expanduser()
+        parts.append(decode_text_bytes(prompt_path.read_bytes(), str(prompt_path), args.prompt_encoding))
     if args.prompt_stdin:
-        parts.append(sys.stdin.read())
+        parts.append(decode_text_bytes(sys.stdin.buffer.read(), "stdin", args.prompt_encoding))
     if not parts:
-        emit({"ok": False, "error": "Provide --prompt, --prompt-file, or --prompt-stdin"}, 2)
+        emit({"ok": False, "error": "Provide --prompt, --prompt-base64, --prompt-file, or --prompt-stdin"}, 2)
     return "\n\n".join(part.strip("\n") for part in parts if part is not None).strip()
 
 
@@ -661,8 +731,10 @@ def build_parser() -> argparse.ArgumentParser:
     ask = sub.add_parser("ask", parents=[common])
     ask.add_argument("--model", help="Override configured model.")
     ask.add_argument("--prompt", help="Inline prompt.")
-    ask.add_argument("--prompt-file", help="UTF-8 prompt file.")
-    ask.add_argument("--prompt-stdin", action="store_true", help="Read prompt text from standard input.")
+    ask.add_argument("--prompt-base64", help="Base64-encoded prompt text. Use this as an ASCII-safe path when shells or terminals mangle Unicode.")
+    ask.add_argument("--prompt-file", help="Prompt file. Encoding is controlled by --prompt-encoding.")
+    ask.add_argument("--prompt-stdin", action="store_true", help="Read prompt text from standard input as bytes, then decode with --prompt-encoding.")
+    ask.add_argument("--prompt-encoding", default=os.environ.get(PROMPT_ENCODING_ENV, "auto"), help="Prompt file/stdin encoding. Use 'auto' to try BOM, UTF-8, terminal locale, GB18030, and UTF-16 variants. Defaults to $ASK_VISION_PROMPT_ENCODING or auto.")
     ask.add_argument("--media", action="append", help="Local media path, HTTP(S) URL, or data URL. Repeat for multiple media files.")
     ask.add_argument("--system", help="Optional system message.")
     ask.add_argument("--detail", default="auto", choices=["auto", "low", "high"], help="Image detail hint for providers that support it.")

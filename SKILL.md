@@ -50,7 +50,7 @@ Use this skill as a generic bridge from a text-only model or agent to a user-con
    printf '%s' "<prompt text>" | python scripts/vision_gateway.py ask --prompt-stdin --media <path-or-url>
    ```
 
-   Use `--prompt-file <path>` only when the prompt already lives in a file or the host agent prefers file-based handoff.
+   Use `--prompt-file <path>` only when the prompt already lives in a file or the host agent prefers file-based handoff. The helper defaults to `--prompt-encoding auto` for prompt files and stdin, which tries UTF-8, UTF-16 variants, the terminal locale, and GB18030. If a host runtime knows the encoding, pass it explicitly, for example `--prompt-encoding utf-16`. If a Windows shell mangles Unicode before Python receives it, use `--prompt-base64 <utf8-base64>` as an ASCII-safe prompt handoff.
 
 7. Treat provider errors as signal. If the model reports unsupported media or the API rejects a content block, explain the limitation and ask for a different provider/model, a URL, a converted artifact, or a smaller clip. If the error is auth-related, re-ask for endpoint/key.
 
@@ -97,9 +97,12 @@ python scripts/vision_gateway.py config-path
 python scripts/vision_gateway.py models --provider auto --base-url <api-url> --api-key <api-key>
 python scripts/vision_gateway.py configure --provider anthropic --base-url https://api.anthropic.com --api-key <api-key> --model <model>
 python scripts/vision_gateway.py ask --prompt "Describe this image." --media image.png
+python scripts/vision_gateway.py ask --prompt-base64 <utf8-base64-prompt> --media image.png
 python scripts/vision_gateway.py ask --prompt-stdin --media image.png
 python scripts/vision_gateway.py clear-config
 ```
+
+Output JSON is ASCII-escaped so legacy Windows terminals such as GBK/CP936 PowerShell do not fail when the model returns Unicode text.
 
 The `models` command returns `likely_multimodal`, `likely_text_only`, and `unknown` lists. Treat these as selection hints, not proof: provider aliases change often, gateway deployments vary, and a small test request is the best confirmation when the user permits it.
 
@@ -110,6 +113,7 @@ Settings are read from CLI flags, then environment variables, then the config fi
 - `ASK_VISION_API_KEY`
 - `ASK_VISION_MODEL`
 - `ASK_VISION_ANTHROPIC_VERSION`
+- `ASK_VISION_PROMPT_ENCODING`
 - `ASK_VISION_CONFIG`
 
 The default config path is OS-generic: `%APPDATA%\ask-vision\config.json` on Windows, `$XDG_CONFIG_HOME/ask-vision/config.json` when available, or `~/.config/ask-vision/config.json`.

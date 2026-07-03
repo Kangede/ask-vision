@@ -14,6 +14,8 @@ OpenClaw, Hermes, shell-based agents, and other custom agents.
 - Supports OpenAI-compatible and Anthropic-compatible APIs.
 - Discovers available models from `/v1/models` when possible.
 - Accepts prompts from CLI text, stdin, or a prompt file.
+- Accepts base64-encoded prompts for ASCII-safe shell handoff.
+- Auto-decodes prompt files/stdin across common Windows and UTF encodings when possible.
 - Accepts media as a local path, public URL, or `data:` URL.
 - Reads local media files and sends them as structured API media content.
 - Keeps API credentials out of prompts and user-facing output.
@@ -108,6 +110,23 @@ python scripts/vision_gateway.py ask \
   --media diagram.png
 ```
 
+ASCII-safe prompt for problematic terminals:
+
+```bash
+python scripts/vision_gateway.py ask \
+  --prompt-base64 "5o+Q56S65L2g6KaB5YiG5p6Q55qE5Zu+54mH" \
+  --media diagram.png
+```
+
+If you know the file or stdin encoding, pass it explicitly:
+
+```bash
+python scripts/vision_gateway.py ask \
+  --prompt-file prompt.txt \
+  --prompt-encoding utf-16 \
+  --media diagram.png
+```
+
 Multiple media inputs:
 
 ```bash
@@ -139,6 +158,21 @@ usually fail.
 
 Large audio or video files are often better passed as provider-accessible URLs
 or shortened clips, because inline API request bodies have size limits.
+
+## Windows Encoding
+
+The helper reads `--prompt-file` and `--prompt-stdin` as bytes and decodes them
+with `--prompt-encoding auto` by default. Auto mode tries BOM-detected UTF,
+UTF-8, the terminal locale, GB18030, and UTF-16 variants. This avoids many
+PowerShell issues where redirected text may be UTF-16 or the terminal may use
+GBK/CP936 instead of UTF-8.
+
+JSON output is ASCII-escaped so legacy Windows consoles do not fail when a
+provider returns Unicode text. Set `ASK_VISION_PROMPT_ENCODING` or pass
+`--prompt-encoding <encoding>` when the host runtime knows the exact encoding.
+If the shell has already replaced characters with question marks before Python
+receives stdin, the original text cannot be recovered; use `--prompt-file` with
+an explicit encoding or `--prompt-base64` for that case.
 
 ## Validate
 
